@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>여행 비용 시뮬레이션</title>
+<style>
+  :root {
+    --sky: #e8f6ff;
+    --sky-2: #cfeeff;
+    --blue: #1e88e5;
+    --blue-dark: #1565c0;
+    --teal: #26a69a;
+    --sun: #ff9800;
+    --ink: #1f2d3d;
+    --muted: #64768a;
+    --line: #d9e6f2;
+    --card: #ffffff;
+    --danger: #d93025;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--sky) 0%, #fffaf0 100%);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  header {
+    text-align: center;
+    padding: 28px 16px 20px;
+    background: linear-gradient(135deg, #42a5f5 0%, #26c6da 60%, #80deea 100%);
+    color: #fff;
+    border-radius: 0 0 28px 28px;
+    box-shadow: 0 6px 18px rgba(30, 136, 229, .25);
+  }
+  header h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.2rem); letter-spacing: -.5px; }
+  header p { margin: 6px 0 0; opacity: .95; font-size: clamp(.9rem, 3.2vw, 1.05rem); }
+
+  main {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 20px 14px 40px;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);   /* 스마트폰: 세로 배치 */
+  }
+  .col { display: grid; gap: 18px; align-content: start; min-width: 0; }
+  @media (min-width: 768px) {                /* 태블릿·PC: 가로 배치 */
+    main { grid-template-columns: 380px minmax(0, 1fr); align-items: start; padding: 28px 20px 48px; }
+    .results { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  }
+  @media (min-width: 1000px) {
+    main { grid-template-columns: 440px minmax(0, 1fr); }
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: 0 4px 16px rgba(31, 45, 61, .08);
+    border: 1px solid var(--line);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 1.15rem; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-weight: 700; margin-bottom: 6px; }
+  .input-wrap { position: relative; display: flex; align-items: center; }
+  .input-wrap input {
+    width: 100%;
+    min-height: 52px;
+    font-size: 1.1rem;           /* 16px 이상: iOS 자동 확대 방지 */
+    padding: 10px 52px 10px 14px;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: #f9fcff;
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .input-wrap input:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(30, 136, 229, .18);
+    background: #fff;
+  }
+  .input-wrap .unit {
+    position: absolute; right: 16px; color: var(--muted); font-weight: 700; pointer-events: none;
+  }
+  .input-wrap.error input { border-color: var(--danger); background: #fff6f5; }
+  .msg { min-height: 1.3em; margin: 4px 2px 0; font-size: .85rem; color: var(--danger); }
+  .msg.muted { color: var(--muted); }
+
+  .stepper { display: flex; gap: 8px; align-items: stretch; }
+  .stepper .input-wrap { flex: 1; }
+  .stepper input { padding-right: 44px; }
+  .btn {
+    min-height: 52px; min-width: 52px;
+    border: none; border-radius: 12px;
+    background: var(--blue); color: #fff;
+    font-size: 1.4rem; font-weight: 700; cursor: pointer;
+    touch-action: manipulation;
+    transition: background .15s, transform .05s;
+  }
+  .btn:hover { background: var(--blue-dark); }
+  .btn:active { transform: scale(.96); }
+  .btn:focus-visible, .link:focus-visible { outline: 3px solid rgba(255, 152, 0, .6); outline-offset: 2px; }
+  .btn.ghost {
+    background: #fff; color: var(--blue-dark); border: 2px solid var(--blue);
+    font-size: .95rem; padding: 6px 12px; width: 100%; line-height: 1.3;
+  }
+  .btn.ghost:hover { background: var(--sky); }
+
+  .period {
+    margin-top: 8px; padding: 10px 14px; border-radius: 12px;
+    background: var(--sky); color: var(--blue-dark); font-weight: 700; text-align: center;
+  }
+  .tools { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; margin-bottom: 14px; }
+  .tip { margin: 0 0 14px; font-size: .85rem; color: var(--muted); }
+
+  /* 일자별 카드 */
+  .day-list { display: grid; gap: 12px; }
+  .day {
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+    background: #fbfdff;
+  }
+  .day-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .day-head strong { font-size: 1.05rem; color: var(--blue-dark); }
+  .badge {
+    font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: #fff3e0; color: #e65100; border: 1px solid #ffcc80;
+  }
+  .cum { margin-left: auto; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .day-grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+  .day .field { margin: 0; }
+  .day .field label { font-size: .85rem; margin-bottom: 4px; }
+  .day .input-wrap input { font-size: 1rem; padding: 10px 30px 10px 8px; }
+  .day .input-wrap .unit { right: 10px; font-size: .9rem; }
+  .day-foot { display: flex; align-items: center; gap: 8px; }
+  .day-foot .msg { flex: 1; }
+  .link {
+    border: none; background: none; color: var(--blue-dark); font-weight: 700; font-size: .85rem;
+    text-decoration: underline; cursor: pointer; padding: 10px 4px; min-height: 44px; touch-action: manipulation;
+  }
+  @media (max-width: 349px) { .day-grid { grid-template-columns: 1fr; } }
+
+  /* 결과 */
+  .summary { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .stat {
+    border-radius: 14px; padding: 14px; background: var(--sky); border: 1px solid var(--sky-2);
+  }
+  .stat .label { font-size: .85rem; color: var(--muted); }
+  .stat .value { font-size: clamp(1.05rem, 4vw, 1.3rem); font-weight: 800; word-break: keep-all; font-variant-numeric: tabular-nums; }
+  .stat.total {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border-color: #ffcc80;
+  }
+  .stat.total .value { font-size: clamp(1.6rem, 7vw, 2.4rem); color: #e65100; }
+  .diff { margin: 10px 2px 0; font-size: .85rem; color: #7a5b00; }
+
+  .chart-box { margin-top: 18px; }
+  .chart-box h3 { margin: 0 0 8px; font-size: 1rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; font-size: .85rem; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .chart-wrap { width: 100%; }
+  canvas { display: block; width: 100%; }
+
+  .notice {
+    margin-top: 18px; padding: 12px 14px; border-radius: 12px;
+    background: #fffbe6; border: 1px solid #ffe58f; color: #7a5b00; font-size: .9rem;
+  }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✈️ 여행 비용 시뮬레이션</h1>
+  <p>몇 박 며칠인지 정하고, 하루하루의 경비를 따로 입력해 총 여행 경비를 확인해 보세요.</p>
+</header>
+
+<main>
+  <div class="col">
+    <!-- 여행 기간 -->
+    <section class="card" aria-labelledby="period-title">
+      <h2 id="period-title">🧳 여행 기간</h2>
+      <div class="field" style="margin-bottom:0">
+        <label for="nights">여행 기간 (박)</label>
+        <div class="stepper">
+          <button type="button" class="btn" id="nightsMinus" aria-label="1박 줄이기">−</button>
+          <div class="input-wrap" id="wrap-nights">
+            <input id="nights" type="text" inputmode="numeric" autocomplete="off" aria-describedby="msg-nights">
+            <span class="unit">박</span>
+          </div>
+          <button type="button" class="btn" id="nightsPlus" aria-label="1박 늘리기">+</button>
+        </div>
+        <div class="period" id="periodText" aria-live="polite"></div>
+        <p class="msg" id="msg-nights" role="alert"></p>
+      </div>
+    </section>
+
+    <!-- 일자별 입력 -->
+    <section class="card" aria-labelledby="days-title">
+      <h2 id="days-title">📅 일자별 경비 입력</h2>
+      <div class="tools">
+        <button type="button" class="btn ghost" id="copyFirst">1일차 금액을<br>모든 날에 복사</button>
+        <button type="button" class="btn ghost" id="resetAll">기본값으로<br>모두 되돌리기</button>
+      </div>
+      <p class="tip">날짜마다 교통비·음식비·쇼핑비를 입력하면 그날의 합계가 자동 계산돼요. 하루 합계를 직접 고칠 수도 있어요.</p>
+      <div class="day-list" id="dayList"></div>
+    </section>
+  </div>
+
+  <!-- 결과 영역 -->
+  <section class="card results" aria-labelledby="result-title">
+    <h2 id="result-title">📊 시뮬레이션 결과</h2>
+
+    <div class="summary" aria-live="polite">
+      <div class="stat total">
+        <div class="label">총 예상 여행 경비</div>
+        <div class="value" id="grandTotal">0원</div>
+      </div>
+      <div class="stat">
+        <div class="label">여행 일수</div>
+        <div class="value" id="daysOut">0일</div>
+      </div>
+      <div class="stat">
+        <div class="label">하루 평균 경비</div>
+        <div class="value" id="avgDaily">0원</div>
+      </div>
+      <div class="stat">
+        <div class="label">교통비 합계</div>
+        <div class="value" id="transportSum">0원</div>
+      </div>
+      <div class="stat">
+        <div class="label">음식비 합계</div>
+        <div class="value" id="foodSum">0원</div>
+      </div>
+      <div class="stat">
+        <div class="label">쇼핑비 합계</div>
+        <div class="value" id="shoppingSum">0원</div>
+      </div>
+      <div class="stat">
+        <div class="label">가장 많이 쓰는 날</div>
+        <div class="value" id="maxDay">-</div>
+      </div>
+    </div>
+    <p class="diff" id="diffNote" hidden></p>
+
+    <div class="chart-box">
+      <h3>일자별 경비 (단위: 원, 1만 = 10,000원)</h3>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:#1e88e5"></i>교통비</span>
+        <span><i style="background:#ffa726"></i>음식비</span>
+        <span><i style="background:#26a69a"></i>쇼핑비</span>
+        <span><i style="background:#b0bec5"></i>직접 조정분</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart" role="img" aria-label="일자별 여행 경비 막대 그래프"></canvas>
+      </div>
+    </div>
+
+    <div class="notice">
+      ⚠️ 이 시뮬레이션은 실제 여행 경비나 매출을 예측하는 것이 아니라, 사용자가 입력한 조건으로 단순 계산한 결과입니다.
+      실제 비용은 물가·환율·일정에 따라 달라질 수 있습니다.
+    </div>
+  </section>
+</main>
+
+<footer>여행 비용 시뮬레이션 · 입력값은 저장되지 않습니다.</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var LIMITS = { nights: 30, amount: 10000000, total: 100000000 };
+  var DEFAULT = { t: 8000, f: 10000, s: 0 };
+  var FIELDS = [
+    { k: 't', label: '교통비' },
+    { k: 'f', label: '음식비' },
+    { k: 's', label: '쇼핑비' },
+    { k: 'total', label: '하루 합계' }
+  ];
+  var COLORS = ['#1e88e5', '#ffa726', '#26a69a', '#b0bec5'];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var list = $('dayList');
+  var nightsInput = $('nights');
+
+  var nights = 2;        // 현재 박 수
+  var days = [];         // 입력 데이터(박 수를 줄여도 값은 보관)
+  var built = 0;         // 화면에 만들어진 일자 카드 수
+
+  function won(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  function num(n) { return Math.round(n).toLocaleString('ko-KR'); }
+
+  function makeDay(src) {
+    var d = { t: src.t, f: src.f, s: src.s, manual: !!src.manual };
+    d.total = src.total != null ? src.total : d.t + d.f + d.s;
+    return d;
+  }
+  function sumOf(d) { return d.t + d.f + d.s; }
+  function ensureDays(count) {
+    if (!days.length) days.push(makeDay(DEFAULT));
+    while (days.length < count) days.push(makeDay(days[days.length - 1]));
+  }
+  function visible() { return days.slice(0, nights + 1); }
+
+  /* 입력창 검증·서식: 숫자만 허용, 음수/문자/상한 초과 차단, 쉼표 자동 삽입 */
+  function readInput(input, limit, unit) {
+    var raw = input.value;
+    var caret = input.selectionStart == null ? raw.length : input.selectionStart;
+    var digitsBefore = raw.slice(0, caret).replace(/\D/g, '').length;
+    var problem = '';
+
+    if (/-/.test(raw)) problem = '음수는 입력할 수 없어요. 0 이상의 숫자만 입력해 주세요.';
+    else if (/[^\d,\s]/.test(raw)) problem = '숫자만 입력할 수 있어요.';
+
+    var digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 12);
+    var value = digits === '' ? 0 : Number(digits);
+    if (value > limit) {
+      value = limit;
+      problem = '최대 ' + num(limit) + unit + '까지 입력할 수 있어요.';
+    }
+    input.value = digits === '' ? '' : num(value);
+
+    var pos = 0, count = 0, text = input.value;
+    while (pos < text.length && count < digitsBefore) {
+      if (/\d/.test(text[pos])) count++;
+      pos++;
+    }
+    try { input.setSelectionRange(pos, pos); } catch (e) {}
+    return { value: value, problem: problem, empty: digits === '' };
+  }
+
+  /* 일자 카드 만들기 */
+  function dayHTML(i) {
+    var h = '<article class="day" id="day-' + i + '">' +
+      '<div class="day-head"><strong>' + (i + 1) + '일차</strong>' +
+      '<span class="badge" id="badge-' + i + '" hidden>합계 직접 입력</span>' +
+      '<span class="cum" id="cum-' + i + '"></span></div>' +
+      '<div class="day-grid">';
+    FIELDS.forEach(function (f) {
+      var id = 'd' + i + '-' + f.k;
+      h += '<div class="field"><label for="' + id + '">' + f.label + '</label>' +
+        '<div class="input-wrap"><input class="amt" id="' + id + '" type="text" inputmode="numeric" ' +
+        'autocomplete="off" data-day="' + i + '" data-key="' + f.k + '" aria-describedby="dmsg-' + i + '">' +
+        '<span class="unit">원</span></div></div>';
+    });
+    h += '</div><div class="day-foot"><p class="msg" id="dmsg-' + i + '" role="alert"></p>' +
+      '<button type="button" class="link" id="auto-' + i + '" data-act="auto" data-day="' + i + '" hidden>자동 합계로</button>' +
+      '</div></article>';
+    return h;
+  }
+
+  function buildDays() {
+    var vis = visible();
+    var html = '';
+    for (var i = 0; i < vis.length; i++) html += dayHTML(i);
+    list.innerHTML = html;
+    vis.forEach(function (d, i) {
+      FIELDS.forEach(function (f) { $('d' + i + '-' + f.k).value = num(d[f.k === 'total' ? 'total' : f.k]); });
+    });
+    built = vis.length;
+  }
+
+  function setDayMsg(i, input, r) {
+    var msg = $('dmsg-' + i);
+    input.closest('.input-wrap').classList.toggle('error', !!r.problem);
+    msg.textContent = r.problem || (r.empty ? '비워 두면 0으로 계산돼요.' : '');
+    msg.classList.toggle('muted', !r.problem && r.empty);
+  }
+
+  /* 화면 갱신 */
+  function updateViews() {
+    var vis = visible();
+    var run = 0;
+    vis.forEach(function (d, i) {
+      run += d.total;
+      $('cum-' + i).textContent = '누적 ' + won(run);
+      $('badge-' + i).hidden = !d.manual;
+      $('auto-' + i).hidden = !d.manual;
+      if (!d.manual) $('d' + i + '-total').value = num(d.total);
+    });
+    updateResults();
+    drawChart();
+  }
+
+  function updateResults() {
+    var vis = visible();
+    var n = vis.length, t = 0, f = 0, s = 0, grand = 0, maxI = 0;
+    vis.forEach(function (d, i) {
+      t += d.t; f += d.f; s += d.s; grand += d.total;
+      if (d.total > vis[maxI].total) maxI = i;
+    });
+
+    $('periodText').textContent = nights === 0 ? '당일치기 (0박 1일)' : nights + '박 ' + n + '일';
+    $('grandTotal').textContent = won(grand);
+    $('daysOut').textContent = n + '일';
+    $('avgDaily').textContent = won(grand / n);
+    $('transportSum').textContent = won(t);
+    $('foodSum').textContent = won(f);
+    $('shoppingSum').textContent = won(s);
+    $('maxDay').textContent = vis[maxI].total > 0 ? (maxI + 1) + '일차 · ' + won(vis[maxI].total) : '-';
+
+    var diff = grand - (t + f + s);
+    var note = $('diffNote');
+    note.hidden = diff === 0;
+    if (diff !== 0) {
+      note.textContent = '직접 입력한 하루 합계 때문에 항목별 합계(' + won(t + f + s) + ')와 총 경비가 ' +
+        won(Math.abs(diff)) + ' ' + (diff > 0 ? '더 많아요.' : '더 적어요.');
+    }
+  }
+
+  function setNights(n) {
+    nights = n;
+    ensureDays(nights + 1);
+    if (built !== nights + 1) buildDays();
+    updateViews();
+  }
+
+  /* 이벤트: 박 수 */
+  nightsInput.addEventListener('input', function () {
+    var r = readInput(nightsInput, LIMITS.nights, '박');
+    $('wrap-nights').classList.toggle('error', !!r.problem);
+    var msg = $('msg-nights');
+    msg.textContent = r.problem || (r.empty ? '비워 두면 0박(당일치기)으로 계산돼요.' : '');
+    msg.classList.toggle('muted', !r.problem && r.empty);
+    setNights(r.value);
+  });
+  $('nightsMinus').addEventListener('click', function () {
+    nightsInput.value = num(Math.max(0, nights - 1));
+    $('wrap-nights').classList.remove('error'); $('msg-nights').textContent = '';
+    setNights(Math.max(0, nights - 1));
+  });
+  $('nightsPlus').addEventListener('click', function () {
+    var v = Math.min(LIMITS.nights, nights + 1);
+    nightsInput.value = num(v);
+    $('wrap-nights').classList.remove('error');
+    $('msg-nights').textContent = v === LIMITS.nights ? '최대 ' + LIMITS.nights + '박까지 입력할 수 있어요.' : '';
+    $('msg-nights').classList.remove('muted');
+    setNights(v);
+  });
+  nightsInput.addEventListener('focus', function () { setTimeout(function () { try { nightsInput.select(); } catch (e) {} }, 0); });
+  nightsInput.addEventListener('blur', function () { if (nightsInput.value === '') { nightsInput.value = '0'; $('msg-nights').textContent = ''; } });
+
+  /* 이벤트: 일자별 입력 (이벤트 위임) */
+  list.addEventListener('input', function (e) {
+    var input = e.target;
+    if (!input.classList || !input.classList.contains('amt')) return;
+    var i = Number(input.dataset.day), key = input.dataset.key;
+    var r = readInput(input, key === 'total' ? LIMITS.total : LIMITS.amount, '원');
+    var d = days[i];
+    d[key] = r.value;
+    if (key === 'total') {
+      d.manual = true;
+    } else {
+      d.manual = false;
+      d.total = Math.min(sumOf(d), LIMITS.total);
+    }
+    setDayMsg(i, input, r);
+    updateViews();
+  });
+  list.addEventListener('focusin', function (e) {
+    var t = e.target;
+    if (t.classList && t.classList.contains('amt')) setTimeout(function () { try { t.select(); } catch (err) {} }, 0);
+  });
+  list.addEventListener('focusout', function (e) {
+    var t = e.target;
+    if (t.classList && t.classList.contains('amt') && t.value === '') {
+      t.value = '0';
+      $('dmsg-' + t.dataset.day).textContent = '';
+    }
+  });
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-act="auto"]') : null;
+    if (!b) return;
+    var d = days[Number(b.dataset.day)];
+    d.manual = false;
+    d.total = Math.min(sumOf(d), LIMITS.total);
+    updateViews();
+  });
+
+  /* 이벤트: 한꺼번에 채우기 */
+  function fillAll(src) {
+    for (var i = 0; i < days.length; i++) {
+      days[i] = makeDay(src);
+    }
+    buildDays();
+    updateViews();
+  }
+  $('copyFirst').addEventListener('click', function () { fillAll(days[0]); });
+  $('resetAll').addEventListener('click', function () { fillAll(DEFAULT); });
+
+  /* 그래프: 일자별 누적 막대(교통·음식·쇼핑 쌓기), 화면 크기에 맞춰 다시 그림 */
+  function compact(n) {
+    if (n >= 10000) {
+      var m = n / 10000;
+      return (m >= 100 ? Math.round(m) : Math.round(m * 10) / 10).toLocaleString('ko-KR') + '만';
+    }
+    return num(n);
+  }
+  function niceMax(v) {
+    if (v <= 0) return 10000;
+    var p = Math.pow(10, Math.floor(Math.log10(v)));
+    var f = v / p;
+    var nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    return nf * p;
+  }
+  function barPath(ctx, x, y, w, h, r, round) {
+    ctx.beginPath();
+    if (round && r > 0) {
+      ctx.moveTo(x, y + h);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h);
+      ctx.closePath();
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  }
+
+  function drawChart() {
+    var cv = $('chart');
+    var wrap = $('chartWrap');
+    var w = Math.max(240, wrap.clientWidth);
+    var h = Math.max(230, Math.min(360, Math.round(w * 0.58)));
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.height = h + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var vis = visible();
+    var n = vis.length;
+    var maxVal = 0;
+    vis.forEach(function (d) { if (d.total > maxVal) maxVal = d.total; });
+    var top = niceMax(maxVal);
+    var small = w < 420;
+    var padL = small ? 42 : 56, padR = 10, padT = 26, padB = 30;
+    var pw = w - padL - padR, ph = h - padT - padB;
+    var font = small ? 11 : 12;
+
+    ctx.font = font + 'px sans-serif';
+    ctx.textBaseline = 'middle';
+
+    var ticks = 4;
+    for (var i = 0; i <= ticks; i++) {
+      var val = top * i / ticks;
+      var y = padT + ph - (ph * i / ticks);
+      ctx.strokeStyle = i === 0 ? '#9fb3c8' : '#e3edf6';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillStyle = '#64768a';
+      ctx.textAlign = 'right';
+      ctx.fillText(compact(val), padL - 6, y);
+    }
+
+    var slot = pw / n;
+    var bw = Math.min(56, slot * 0.66);
+    var labelEvery = Math.max(1, Math.ceil(30 / slot));
+    var showVals = n <= (small ? 5 : 8);
+
+    vis.forEach(function (d, idx) {
+      var x = padL + slot * idx + (slot - bw) / 2;
+      var sum = sumOf(d);
+      var scale = sum > 0 && d.total < sum ? d.total / sum : 1;
+      var segs = [d.t * scale, d.f * scale, d.s * scale, Math.max(0, d.total - sum)];
+      var lastSeg = -1;
+      segs.forEach(function (v, k) { if (v > 0) lastSeg = k; });
+
+      var base = padT + ph;
+      segs.forEach(function (v, k) {
+        if (v <= 0) return;
+        var sh = ph * v / top;
+        ctx.fillStyle = COLORS[k];
+        barPath(ctx, x, base - sh, bw, sh, Math.min(6, bw / 2, sh), k === lastSeg);
+        ctx.fill();
+        base -= sh;
+      });
+
+      if (idx % labelEvery === 0 || idx === n - 1) {
+        ctx.fillStyle = '#64768a';
+        ctx.textAlign = 'center';
+        ctx.font = font + 'px sans-serif';
+        ctx.fillText((idx + 1) + '일', x + bw / 2, h - padB / 2 + 2);
+      }
+      if (showVals && d.total > 0) {
+        ctx.fillStyle = '#1565c0';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold ' + font + 'px sans-serif';
+        ctx.fillText(compact(d.total), x + bw / 2, Math.max(10, base - 10));
+        ctx.font = font + 'px sans-serif';
+      }
+    });
+
+    var grand = 0;
+    vis.forEach(function (d) { grand += d.total; });
+    cv.setAttribute('aria-label', '일자별 여행 경비 막대 그래프. ' + n + '일간 총 ' + won(grand));
+  }
+
+  var resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(drawChart, 60);
+  });
+  if (window.ResizeObserver) new ResizeObserver(function () { drawChart(); }).observe($('chartWrap'));
+
+  /* 초기값 */
+  nightsInput.value = num(nights);
+  setNights(nights);
+})();
+</script>
+</body>
+</html>
